@@ -1,0 +1,87 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "Product Service",
+    "description": "This service serves products.",
+    "version": "2023-11-19T20:26:54Z"
+  },
+  "servers": [
+    {
+      "url": "https://zp8opgz3pj.execute-api.us-east-1.amazonaws.com/{basePath}",
+      "variables": { "basePath": { "default": "dev" } }
+    }
+  ],
+  "paths": {
+    "/products/{productId}": {
+      "get": {
+        "parameters": [
+          {
+            "name": "productId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ]
+      },
+      "options": {
+        "parameters": [
+          {
+            "name": "productId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "204 response",
+            "headers": {
+              "Access-Control-Allow-Origin": { "schema": { "type": "string" } },
+              "Access-Control-Allow-Methods": {
+                "schema": { "type": "string" }
+              },
+              "Access-Control-Allow-Headers": { "schema": { "type": "string" } }
+            },
+            "content": {}
+          }
+        }
+      }
+    },
+    "/": {
+      "options": {
+        "responses": {
+          "204": {
+            "description": "204 response",
+            "headers": {
+              "Access-Control-Allow-Origin": { "schema": { "type": "string" } },
+              "Access-Control-Allow-Methods": {
+                "schema": { "type": "string" }
+              },
+              "Access-Control-Allow-Headers": { "schema": { "type": "string" } }
+            },
+            "content": {}
+          }
+        }
+      }
+    },
+    "/products": {
+      "get": {},
+      "options": {
+        "responses": {
+          "204": {
+            "description": "204 response",
+            "headers": {
+              "Access-Control-Allow-Origin": { "schema": { "type": "string" } },
+              "Access-Control-Allow-Methods": {
+                "schema": { "type": "string" }
+              },
+              "Access-Control-Allow-Headers": { "schema": { "type": "string" } }
+            },
+            "content": {}
+          }
+        }
+      }
+    }
+  },
+  "components": {}
+}
