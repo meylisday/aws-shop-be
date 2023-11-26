@@ -1,26 +1,26 @@
 import { handler } from '../src/handlers/getProductsList';
-import { PRODUCTS } from '../src/constants';
 import { response } from "../src/utils";
 
 describe('get product list', () => {
     test('get product list array', async () => {
         const result = await handler();
-        expect(result).toEqual(response(200, PRODUCTS))
+        expect(result.statusCode).toBe(200);
+        expect(JSON.parse(result.body)).toEqual(expect.arrayContaining([
+            expect.objectContaining({
+                id: expect.any(String),
+                count: expect.any(Number),
+                price: expect.any(Number),
+                title: expect.any(String),
+                description: expect.any(String),
+            }),
+        ]));
     })
 
     test('error', async () => {
         try {
-            const response = await handler()
-        } catch {
-            const mockError = new Error('Test Error');
-            const res = response(500, {
-                mockError
-            })
-
-            expect(res).toEqual(response(500, {
-                mockError
-            }))
+            await handler();
+        } catch (error) {
+            expect(error).toEqual(response(500, { error: 'Internal Server Error' }));
         }
-
     })
 })

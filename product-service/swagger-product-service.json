@@ -3,7 +3,7 @@
   "info": {
     "title": "Product Service",
     "description": "This service serves products.",
-    "version": "2023-11-19T20:26:54Z"
+    "version": "2023-11-24T19:28:36Z"
   },
   "servers": [
     {
@@ -66,6 +66,7 @@
     },
     "/products": {
       "get": {},
+      "post": {},
       "options": {
         "responses": {
           "204": {
