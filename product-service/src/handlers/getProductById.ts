@@ -7,7 +7,7 @@ const dynamoDB = new DynamoDB.DocumentClient({ region: 'us-east-1' });
 export const handler = async (event: any = {}): Promise<APIGatewayProxyResult> => {
     
     console.log("Incoming request:", event);
-    
+
     try {
         const productId = event.pathParameters?.productId;
 
@@ -16,7 +16,7 @@ export const handler = async (event: any = {}): Promise<APIGatewayProxyResult> =
         }
 
         const params = {
-            TableName: 'products',
+            TableName: process.env.PRODUCTS_TABLE as string,
             Key: {
                 id: productId,
             },
@@ -29,7 +29,7 @@ export const handler = async (event: any = {}): Promise<APIGatewayProxyResult> =
         }
 
         const stockParams = {
-            TableName: 'stocks',
+            TableName: process.env.STOCKS_TABLE as string,
             Key: {
                 product_id: productId,
             },

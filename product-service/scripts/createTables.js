@@ -5,7 +5,7 @@ AWS.config.update({ region: 'us-east-1' });
 const dynamodb = new AWS.DynamoDB();
 
 dynamodb.createTable({
-  TableName: 'products',
+  TableName: process.env.PRODUCTS_TABLE,
   KeySchema: [
     { AttributeName: 'id', KeyType: 'HASH' },
   ],
@@ -26,7 +26,7 @@ dynamodb.createTable({
 
 // Создание таблицы 'stocks'
 dynamodb.createTable({
-  TableName: 'stocks',
+  TableName: process.env.STOCKS_TABLE,
   KeySchema: [
     { AttributeName: 'product_id', KeyType: 'HASH' },
   ],

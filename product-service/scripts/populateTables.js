@@ -7,7 +7,7 @@ const dynamoDB = new AWS.DynamoDB.DocumentClient();
 
 const createProduct = async (title, description, price) => {
   const params = {
-    TableName: 'products',
+    TableName: process.env.PRODUCTS_TABLE,
     Item: {
       id: uuidv4(),
       title,
@@ -21,7 +21,7 @@ const createProduct = async (title, description, price) => {
 
 const createStock = async (productId, count) => {
   const params = {
-    TableName: 'stocks',
+    TableName: process.env.STOCKS_TABLE,
     Item: {
       product_id: productId,
       count,
@@ -39,7 +39,7 @@ const populateTables = async () => {
     await createProduct('Product 4', 'Description 4', 30);
     await createProduct('Product 5', 'Description 5', 30);
 
-    const products = await dynamoDB.scan({ TableName: 'products' }).promise();
+    const products = await dynamoDB.scan({ TableName: process.env.PRODUCTS_TABLE }).promise();
 
     for (const product of products.Items) {
       await createStock(product.id, Math.floor(Math.random() * 100) + 1);

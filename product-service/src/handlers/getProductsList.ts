@@ -10,14 +10,14 @@ export const handler = async (event: any = {}): Promise<APIGatewayProxyResult> =
 
     try {
         const params = {
-            TableName: 'products',
+            TableName: process.env.PRODUCTS_TABLE as string,
         };
 
         const result = await dynamoDB.scan(params).promise();
 
         const products = result.Items?.map(async (item) => {
             const stockParams = {
-                TableName: 'stocks',
+                TableName: process.env.STOCKS_TABLE as string,
                 Key: {
                     product_id: item.id,
                 },

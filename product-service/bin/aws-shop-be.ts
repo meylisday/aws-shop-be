@@ -16,6 +16,9 @@ const sharedLambdaProps: Partial<NodejsFunctionProps> = {
     runtime: lambda.Runtime.NODEJS_18_X,
     environment: {
         PRODUCT_AWS_REGION: 'us-east-1',
+        ACCOUNT_ID: '5041-3785-4779',
+        PRODUCTS_TABLE: 'products',
+        STOCKS_TABLE: 'stocks',
     }
 }
 
@@ -32,15 +35,22 @@ const api = new apigateway.RestApi(productServiceStack, 'ProductApi', {
     }
 });
 
+
 //getProducts
 const getProductsList = new NodejsFunction(productServiceStack, 'GetProductListLambda', {
     ...sharedLambdaProps,
     functionName: 'getProductsList',
-    entry: 'src/handlers/getProductsList.ts'
+    entry: 'src/handlers/getProductsList.ts',
+    initialPolicy: [
+        new iam.PolicyStatement({
+            actions: ['dynamodb:Scan', 'dynamodb:GetItem'], 
+            resources: [
+                `arn:aws:dynamodb:us-east-1:504137854779:table/products`,
+                `arn:aws:dynamodb:us-east-1:504137854779:table/stocks`
+            ],
+        }),
+    ],
 });
-
-const lambdaRole = getProductsList.role!;
-lambdaRole.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonDynamoDBFullAccess'));
 
 const productsResource = api.root.addResource('products');
 const getProductsListIntegration = new apigateway.LambdaIntegration(getProductsList, {
@@ -52,11 +62,17 @@ productsResource.addMethod("GET", getProductsListIntegration);
 const getProductById = new NodejsFunction(productServiceStack, 'GetProductByIdLambda', {
     ...sharedLambdaProps,
     functionName: 'getProductById',
-    entry: 'src/handlers/getProductById.ts'
+    entry: 'src/handlers/getProductById.ts',
+    initialPolicy: [
+        new iam.PolicyStatement({
+            actions: ['dynamodb:Scan', 'dynamodb:GetItem'],
+            resources: [
+                `arn:aws:dynamodb:us-east-1:504137854779:table/products`,
+                `arn:aws:dynamodb:us-east-1:504137854779:table/stocks`
+            ],
+        }),
+    ],
 })
-
-const lambdaRoleGetProductById = getProductById.role!;
-lambdaRoleGetProductById.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonDynamoDBFullAccess'));
 
 const productResource = productsResource.addResource('{productId}');
 const getProductByIdIntegration = new apigateway.LambdaIntegration(getProductById, {
@@ -68,17 +84,21 @@ productResource.addMethod("GET", getProductByIdIntegration);
 const createProduct = new NodejsFunction(productServiceStack, 'CreateProductLambda', {
     ...sharedLambdaProps,
     functionName: 'createProduct',
-    entry: 'src/handlers/createProduct.ts'
+    entry: 'src/handlers/createProduct.ts',
+    initialPolicy: [
+        new iam.PolicyStatement({
+            actions: ['dynamodb:Scan', 'dynamodb:GetItem', 'dynamodb:PutItem'],
+            resources: [
+                `arn:aws:dynamodb:us-east-1:504137854779:table/products`,
+                `arn:aws:dynamodb:us-east-1:504137854779:table/stocks`
+            ],
+        }),
+    ],
 });
-
-const lambdaRoleCreateProduct = createProduct.role!;
-lambdaRoleCreateProduct.addManagedPolicy(iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonDynamoDBFullAccess'));
 
 const createProductIntegration = new apigateway.LambdaIntegration(createProduct, {
     requestTemplates: { "application/json": '{ "statusCode": "200" }' }
 });
 productsResource.addMethod("POST", createProductIntegration);
 
-
 new SwaggerUi(productServiceStack, "SwaggerUI", { resource: api.root });
-

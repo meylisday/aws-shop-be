@@ -2,8 +2,25 @@ import { DynamoDB } from "aws-sdk";
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import { response } from "../utils";
 import { v4 as uuidv4 } from "uuid";
+import Ajv from "ajv";
 
 const dynamoDB = new DynamoDB.DocumentClient({ region: "us-east-1" });
+
+const ajv = new Ajv();
+
+const productSchema = {
+    type: "object",
+    properties: {
+        title: { type: "string", maxLength: 255 },
+        description: { type: "string", maxLength: 1000 },
+        price: { type: "number", minimum: 0 },
+        count: { type: "integer", minimum: 0 },
+    },
+    required: ["title", "description", "price", "count"],
+    additionalProperties: false,
+};
+
+const validateProduct = ajv.compile(productSchema);
 
 export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayProxyResult> => {
 
@@ -12,17 +29,19 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
   try {
     const requestBody = JSON.parse(event.body || "{}");
 
-    const requiredFields = ['title', 'description', 'price'];
-    const missingFieldsResponse = checkRequiredFields(requestBody, requiredFields);
+    const valid = validateProduct(requestBody);
 
-    if (missingFieldsResponse) {
-        return missingFieldsResponse;
+    if (!valid) {
+        return response(400, {
+            error: "Invalid request body. Please check the data format.",
+            errors: validateProduct.errors,
+        });
     }
 
     const productId = uuidv4();
 
     const productParams = {
-      TableName: "products",
+      TableName: process.env.PRODUCTS_TABLE as string,
       Item: {
         id: productId,
         title: requestBody.title,
@@ -32,7 +51,7 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
     };
 
     const stockParams = {
-      TableName: "stocks",
+      TableName: process.env.STOCKS_TABLE as string,
       Item: {
         product_id: productId,
         count: requestBody.count || 0,
@@ -67,15 +86,4 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
 
     return response(500, { error: "Internal Server Error" });
   }
-};
-
-export const checkRequiredFields = (requestBody: any, requiredFields: string[]): APIGatewayProxyResult | null => {
-    const missingFields = requiredFields.filter(field => !requestBody[field]);
-
-    if (missingFields.length > 0) {
-        const errorMessage = `Missing required fields: ${missingFields.join(', ')}`;
-        return response(400, { error: errorMessage });
-    }
-
-    return null;
 };
