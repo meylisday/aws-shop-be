@@ -6,6 +6,7 @@ import * as apigateway from "aws-cdk-lib/aws-apigateway";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import { HttpMethods } from 'aws-cdk-lib/aws-s3';
 import * as s3n from 'aws-cdk-lib/aws-s3-notifications';
+import { SwaggerUi } from "@pepperize/cdk-apigateway-swagger-ui";
 
 export const app = new cdk.App();
 
@@ -107,3 +108,4 @@ bucket.addEventNotification(
     prefix: 'uploaded',
 });
 
+new SwaggerUi(stack, "SwaggerUI", { resource: api.root });
