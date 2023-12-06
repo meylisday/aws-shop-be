@@ -7,6 +7,7 @@ import * as s3 from "aws-cdk-lib/aws-s3";
 import { HttpMethods } from 'aws-cdk-lib/aws-s3';
 import * as s3n from 'aws-cdk-lib/aws-s3-notifications';
 import { SwaggerUi } from "@pepperize/cdk-apigateway-swagger-ui";
+import { Cors } from 'aws-cdk-lib/aws-apigateway';
 
 export const app = new cdk.App();
 
@@ -24,7 +25,6 @@ const sharedLambdaProps: Partial<NodejsFunctionProps> = {
 
 const bucket = new s3.Bucket(stack, 'ImportBucket', { 
     bucketName: 'aws-shop-be-import-products',       
-    blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
     removalPolicy: cdk.RemovalPolicy.DESTROY,
     autoDeleteObjects: true
 });
@@ -45,7 +45,7 @@ bucket.grantReadWrite(importProductsFileLambda);
 bucket.grantReadWrite(importFileParserLambda);
 bucket.grantDelete(importFileParserLambda);
 
-const api = new apigateway.RestApi(stack, 'ProductApi', {
+const api = new apigateway.RestApi(stack, 'ImportApi', {
     restApiName: 'Import Service',
     description: 'This service import products',
     defaultCorsPreflightOptions: {
@@ -75,7 +75,13 @@ const importModel = api.addModel('ImportModel', {
 
 const importProductFilesIntegration = new apigateway.LambdaIntegration(importProductsFileLambda);
 
-const importProductFilesResource = api.root.addResource('import');
+const importProductFilesResource = api.root.addResource('import', {
+    defaultCorsPreflightOptions: {
+        allowHeaders: ['*'],
+        allowOrigins: ['*'],
+        allowMethods: [HttpMethods.GET, HttpMethods.PUT],
+    },
+});
 
 importProductFilesResource.addMethod('GET', importProductFilesIntegration, {
     methodResponses: [
@@ -100,6 +106,8 @@ importProductFilesResource.addMethod('GET', importProductFilesIntegration, {
         },
     },
     ],
+    authorizationType: apigateway.AuthorizationType.NONE,
+    apiKeyRequired: false,
 });
 
 bucket.addEventNotification(
