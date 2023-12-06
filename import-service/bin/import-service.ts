@@ -7,7 +7,6 @@ import * as s3 from "aws-cdk-lib/aws-s3";
 import { HttpMethods } from 'aws-cdk-lib/aws-s3';
 import * as s3n from 'aws-cdk-lib/aws-s3-notifications';
 import { SwaggerUi } from "@pepperize/cdk-apigateway-swagger-ui";
-import { Cors } from 'aws-cdk-lib/aws-apigateway';
 
 export const app = new cdk.App();
 
