@@ -33,7 +33,7 @@ export const handler = async (event: any = {}): Promise<APIGatewayProxyResult> =
       console.log("Returning response...");
 
       console.log("Response:", signedUrl);
-      return response(200, { signedUrl: signedUrl });
+      return response(200, signedUrl);
     } catch (e) {
       return response(500, {
         message: { error: "Internal Server Error" },
