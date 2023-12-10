@@ -5,24 +5,66 @@ import * as lambda from 'aws-cdk-lib/aws-lambda';
 import { NodejsFunction, NodejsFunctionProps } from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as apigateway from "aws-cdk-lib/aws-apigateway";
 import { SwaggerUi } from "@pepperize/cdk-apigateway-swagger-ui";
+import * as dotenv from 'dotenv';
+import * as sns from 'aws-cdk-lib/aws-sns';
+import * as sqs from 'aws-cdk-lib/aws-sqs';
+import { SqsEventSource } from 'aws-cdk-lib/aws-lambda-event-sources';
 
-export const app = new cdk.App();
+dotenv.config();
 
-export const productServiceStack = new cdk.Stack(app, 'ProductServiceStack', {
-    env: { region: 'us-east-1' }
+const app = new cdk.App();
+
+const stack = new cdk.Stack(app, 'ProductServiceStack', {
+    env: { region: process.env.PRODUCT_AWS_REGION! }
+})
+
+const importProductTopic = new sns.Topic(stack, 'ImportProductTopic', {
+    topicName: 'import-products-topic'
+})
+
+const importQueue = new sqs.Queue(stack, 'ImportQueue', {
+    queueName: 'import-file-queue'
+})
+
+new sns.Subscription(stack, 'BigStockSubscription', {
+    endpoint: process.env.BIG_STOCK_EMAIL!,
+    protocol: sns.SubscriptionProtocol.EMAIL,
+    topic: importProductTopic,
+    filterPolicy: {
+        count: sns.SubscriptionFilter.numericFilter({ lessThanOrEqualTo: 10 }),
+    },
 })
 
 const sharedLambdaProps: Partial<NodejsFunctionProps> = {
     runtime: lambda.Runtime.NODEJS_18_X,
     environment: {
-        PRODUCT_AWS_REGION: 'us-east-1',
-        ACCOUNT_ID: '5041-3785-4779',
-        PRODUCTS_TABLE: 'products',
-        STOCKS_TABLE: 'stocks',
+        PRODUCT_AWS_REGION: process.env.PRODUCT_AWS_REGION!,
+        ACCOUNT_ID: process.env.ACCOUNT_ID!,
+        PRODUCTS_TABLE: process.env.PRODUCTS_TABLE!,
+        STOCKS_TABLE: process.env.STOCKS_TABLE!,
+        IMPORT_PRODUCTS_TOPIC_ARN: importProductTopic.topicArn
     }
 }
 
-const api = new apigateway.RestApi(productServiceStack, 'ProductApi', {
+const catalogBatchProcess = new NodejsFunction(stack, 'CatalogBatchProcessLambda', {
+    ...sharedLambdaProps,
+    functionName: 'catalogBatchProcess',
+    entry: 'src/handlers/catalogBatchProcess.ts',
+    initialPolicy: [
+        new iam.PolicyStatement({
+            actions: ['dynamodb:Scan', 'dynamodb:GetItem', 'dynamodb:PutItem'],
+            resources: [
+                `arn:aws:dynamodb:us-east-1:504137854779:table/products`,
+                `arn:aws:dynamodb:us-east-1:504137854779:table/stocks`
+            ],
+        }),
+    ],
+});
+
+importProductTopic.grantPublish(catalogBatchProcess);
+catalogBatchProcess.addEventSource(new SqsEventSource(importQueue, { batchSize: 5 }));
+
+const api = new apigateway.RestApi(stack, 'ProductApi', {
     restApiName: 'Product Service',
     description: 'This service serves products.',
     defaultCorsPreflightOptions: {
@@ -37,7 +79,7 @@ const api = new apigateway.RestApi(productServiceStack, 'ProductApi', {
 
 
 //getProducts
-const getProductsList = new NodejsFunction(productServiceStack, 'GetProductListLambda', {
+const getProductsList = new NodejsFunction(stack, 'GetProductListLambda', {
     ...sharedLambdaProps,
     functionName: 'getProductsList',
     entry: 'src/handlers/getProductsList.ts',
@@ -59,7 +101,7 @@ const getProductsListIntegration = new apigateway.LambdaIntegration(getProductsL
 productsResource.addMethod("GET", getProductsListIntegration);
 
 //getProductById
-const getProductById = new NodejsFunction(productServiceStack, 'GetProductByIdLambda', {
+const getProductById = new NodejsFunction(stack, 'GetProductByIdLambda', {
     ...sharedLambdaProps,
     functionName: 'getProductById',
     entry: 'src/handlers/getProductById.ts',
@@ -81,7 +123,7 @@ const getProductByIdIntegration = new apigateway.LambdaIntegration(getProductByI
 productResource.addMethod("GET", getProductByIdIntegration);
 
 //createProduct
-const createProduct = new NodejsFunction(productServiceStack, 'CreateProductLambda', {
+const createProduct = new NodejsFunction(stack, 'CreateProductLambda', {
     ...sharedLambdaProps,
     functionName: 'createProduct',
     entry: 'src/handlers/createProduct.ts',
@@ -101,4 +143,4 @@ const createProductIntegration = new apigateway.LambdaIntegration(createProduct,
 });
 productsResource.addMethod("POST", createProductIntegration);
 
-new SwaggerUi(productServiceStack, "SwaggerUI", { resource: api.root });
+new SwaggerUi(stack, "SwaggerUI", { resource: api.root });

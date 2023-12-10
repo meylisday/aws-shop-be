@@ -1,8 +1,8 @@
 import { DynamoDB } from "aws-sdk";
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import { response } from "../utils";
-import { v4 as uuidv4 } from "uuid";
 import Ajv from "ajv";
+import { createProduct } from '../db/products';
 
 const dynamoDB = new DynamoDB.DocumentClient({ region: "us-east-1" });
 
@@ -38,38 +38,7 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
         });
     }
 
-    const productId = uuidv4();
-
-    const productParams = {
-      TableName: process.env.PRODUCTS_TABLE as string,
-      Item: {
-        id: productId,
-        title: requestBody.title,
-        description: requestBody.description,
-        price: requestBody.price,
-      },
-    };
-
-    const stockParams = {
-      TableName: process.env.STOCKS_TABLE as string,
-      Item: {
-        product_id: productId,
-        count: requestBody.count || 0,
-      },
-    };
-
-    const transactionParams = {
-      TransactItems: [
-        {
-          Put: productParams,
-        },
-        {
-          Put: stockParams,
-        },
-      ],
-    };
-
-    await dynamoDB.transactWrite(transactionParams).promise();
+    const { productId } = await createProduct(requestBody);
 
     return response(200, {
       message: "Product and stock created successfully",

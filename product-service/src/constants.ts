@@ -1,9 +1,10 @@
 export const PRODUCTS = [
     {
-        "id": '1',
-        "title": "iPhone 9",
-        "description": "An apple mobile which is nothing like apple",
-        "price": 549
+        "id": '4be63a87-18f7-4416-adf7-1a08a0eca15e',
+        "count": 88,
+        "price": 10,
+        "title": "Product 1",
+        "description": "Description 1",
     },
     {
         "id": '2',
