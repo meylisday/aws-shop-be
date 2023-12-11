@@ -17,14 +17,16 @@ export const handler = async (event: any) => {
       console.log(parsedBody);
       const newProductData = await createProduct(parsedBody);
       newProducts.push(newProductData);
-      await snsClient.send(
-        new PublishCommand({
-          Subject: "New files Added to Catalog",
-          Message: JSON.stringify(newProductData),
-          TopicArn: process.env.IMPORT_PRODUCTS_TOPIC_ARN
-        })
-      );
     }
+
+    await snsClient.send(
+      new PublishCommand({
+        Subject: "New files Added to Catalog",
+        Message: JSON.stringify(newProducts),
+        TopicArn: process.env.IMPORT_PRODUCTS_TOPIC_ARN
+      })
+    );
+    
     return response(200, 'Product created');
   } catch (err) {
     console.log(err);
