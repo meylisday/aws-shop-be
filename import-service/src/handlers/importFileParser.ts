@@ -1,58 +1,91 @@
 import { S3Event } from "aws-lambda";
-import {
-  CopyObjectCommand,
-  DeleteObjectCommand,
-  GetObjectCommand,
-  S3Client,
-} from "@aws-sdk/client-s3";
-import { Readable } from "stream";
+import * as sdk from "aws-sdk";
 import csv from "csv-parser";
-import { response } from "../utils";
+import { Transform, TransformCallback } from "stream";
+import * as dotenv from "dotenv";
+dotenv.config();
 
-export const handler = async (event: S3Event) => {
-  const s3Client = new S3Client({ region: process.env.AWS_REGION });
+const s3Bucket = new sdk.S3({ region: "eu-west-1" });
+const sqs = new sdk.SQS();
 
+export const handler = async function (event: S3Event): Promise<void> {
   for (const record of event.Records) {
-    const bucket = record.s3.bucket.name;
-    const key = decodeURIComponent(record.s3.object.key.replace(/\+/g, " "));
     const params = {
-      Bucket: bucket,
-      Key: key,
+      Bucket: record.s3.bucket.name,
+      Key: record.s3.object.key,
     };
 
-    try {
-      const file = await s3Client.send(new GetObjectCommand(params));
-      const readableStream = file.Body;
-      if (!(readableStream instanceof Readable)) {
-        throw new Error("Failed to read file");
-      }
-
-      await new Promise((resolve, reject) => {
-        readableStream
-          .pipe(csv())
-          .on("data", async (data) => {
-            console.log(data);
-          })
-          .on("error", reject)
-          .on("end", resolve);
-      });
-      const copyParams = {
-        Bucket: bucket,
-        CopySource: bucket + "/" + key,
-        Key: key.replace("uploaded", "parsed"),
-      };
-
-      await s3Client.send(new CopyObjectCommand(copyParams));
-      console.log("Copied into parsed folder");
-
-      await s3Client.send(new DeleteObjectCommand(params));
-      console.log("Deleted from uploaded folder");
-    } catch (e) {
-      return response(500, {
-        message: "Error processing S3 event:",
-        e,
-      });
-    }
+    console.log(`readFile start: ${params.Key}`);
+    await fileParseStream(params, record);
   }
-  return response(200, { message: "File parsed successfully" });
 };
+
+async function fileParseStream(params: { Bucket: string; Key: string }, record: any) {
+  const stream = s3Bucket.getObject(params).createReadStream();
+
+  return new Promise<void>((res, rej) => {
+    const transformStream = new Transform({
+      objectMode: true,
+      transform(chunk: any, encoding: BufferEncoding, callback: TransformCallback) {
+        sendToSQS(chunk);
+        callback();
+      },
+    });
+
+    stream
+      .pipe(csv())
+      .pipe(transformStream)
+      .on("finish", async () => {
+        const bucketName = params.Bucket;
+        const key = decodeURIComponent(params.Key.replace(/\+/g, " "));
+        console.log(`${key} stream finish`);
+
+        const sourceKey = key.replace("uploaded", "parsed");
+        if (key === sourceKey) {
+          console.log("File is already in the parsed folder");
+          return res();
+        }
+
+        try {
+          await s3Bucket
+            .copyObject({
+              CopySource: `${bucketName}/${key}`,
+              Bucket: bucketName,
+              Key: sourceKey,
+            })
+            .promise();
+
+          await s3Bucket
+            .deleteObject({
+              Bucket: bucketName,
+              Key: key,
+            })
+            .promise();
+
+          res();
+        } catch (error: any) {
+          console.error("Error occurred during file moving: ", error.message);
+          rej(error);
+        }
+      })
+      .on("error", (error: Error) => {
+        console.error("Error occurred during stream processing: ", error.message);
+        rej(error);
+      });
+  });
+}
+
+function sendToSQS(data: any) {
+  const params = {
+    QueueUrl: "https://sqs.us-east-1.amazonaws.com/504137854779/import-file-queue",
+    MessageBody: JSON.stringify(data),
+  };
+
+  sqs.sendMessage(params, (err) => {
+    if (err) {
+      console.error("Error sending message", err);
+    } else {
+      console.log("Message successfully sent", data.MessageId);
+    }
+  });
+}

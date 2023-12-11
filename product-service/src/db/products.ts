@@ -32,9 +32,12 @@ export const createProduct = async (newProduct: any) => {
     ],
   };
 
-  await dynamoDB.transactWrite(transactionParams).promise();
-
-  console.log('ddd', newProduct);
-
-  return {...newProduct, productId: productId };
+  try {
+    await dynamoDB.transactWrite(transactionParams).promise();
+    console.log('Product created successfully:', newProduct);
+    return { ...newProduct, productId };
+  } catch (error) {
+    console.error("Error creating product:", error);
+    throw error;
+  }
 };
