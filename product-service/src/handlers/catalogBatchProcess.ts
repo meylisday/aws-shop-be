@@ -1,7 +1,6 @@
 import { PublishCommand, SNSClient } from "@aws-sdk/client-sns";
 import { createProduct } from "../db/products";
 import { response } from "../utils";
-import { get } from "lodash";
 import * as dotenv from 'dotenv';
 dotenv.config();
 
