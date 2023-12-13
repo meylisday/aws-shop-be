@@ -3,8 +3,7 @@ import { APIGatewayProxyEvent, APIGatewayProxyResult } from "aws-lambda";
 import { response } from "../utils";
 import Ajv from "ajv";
 import { createProduct } from '../db/products';
-
-const dynamoDB = new DynamoDB.DocumentClient({ region: "us-east-1" });
+import { v4 as uuidv4 } from "uuid";
 
 const ajv = new Ajv();
 
@@ -38,11 +37,24 @@ export const handler = async (event: APIGatewayProxyEvent): Promise<APIGatewayPr
         });
     }
 
-    const { productId } = await createProduct(requestBody);
+    const productId = uuidv4();
+
+    const { title, description, price, count } = requestBody
+
+    const result = await createProduct( {
+      productId,
+      title,
+      description,
+      price,
+    },
+    {
+      product_id: productId,
+      count,
+    },);
 
     return response(200, {
       message: "Product and stock created successfully",
-      productId,
+      result,
     });
   } catch (err: any) {
     console.error(err);

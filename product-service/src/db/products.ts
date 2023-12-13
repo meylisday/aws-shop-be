@@ -1,83 +1,34 @@
 import { v4 as uuidv4 } from "uuid";
-import { DynamoDB } from "aws-sdk";
 import * as dotenv from "dotenv";
-import Ajv from "ajv";
-import { response } from "../utils";
+import { marshall, unmarshall } from '@aws-sdk/util-dynamodb';
+import { DynamoDBClient, TransactWriteItemsCommand } from '@aws-sdk/client-dynamodb';
 
 dotenv.config();
 
-const dynamoDB = new DynamoDB.DocumentClient({ region: "us-east-1" });
+const dynamoDB = new DynamoDBClient({ region: "us-east-1" });
 
-export const createProduct = async (newProduct: any): Promise<any> => {
-  const productId = uuidv4();
+export const createProduct = async (product: object, stock: object): Promise<any> => {
 
-  const ajv = new Ajv();
-
-  const product = {
-    title: newProduct.title,
-    description: newProduct.description,
-    price: parseInt(newProduct.price),
-    count: parseInt(newProduct.count),
-}
-
-  console.log('product:', product);
-
-  const productSchema = {
-    type: "object",
-    properties: {
-      title: { type: "string", maxLength: 255 },
-      description: { type: "string", maxLength: 1000 },
-      price: { type: "number", minimum: 0 },
-      count: { type: "integer", minimum: 0 },
-    },
-    required: ["title", "description", "price", "count"],
-    additionalProperties: false,
-  };
-
-  const validateProduct = ajv.compile(productSchema);
-
-  console.log('validate product', validateProduct);
-
-  const valid = validateProduct(product);
-
-  console.log('valid', valid);
-
-  if (!valid) {
-    return response(400, {
-      error: "Invalid request body. Please check the data format.",
-      errors: validateProduct.errors,
-    });
-  }
-
-  const transactionParams = {
+  const command = new TransactWriteItemsCommand({
     TransactItems: [
       {
         Put: {
-          TableName: process.env.PRODUCTS_TABLE as string,
-          Item: {
-            id: productId,
-            title: product.title,
-            description: product.description,
-            price: product.price,
-          },
+          TableName: process.env.PRODUCTS_TABLE,
+          Item: marshall(product)
         },
       },
       {
         Put: {
-          TableName: process.env.STOCKS_TABLE as string,
-          Item: {
-            product_id: productId,
-            count: product.count || 0,
-          },
+          TableName: process.env.STOCKS_TABLE,
+          Item: marshall(stock),
         },
       },
     ],
-  };
+  });
 
   try {
-    await dynamoDB.transactWrite(transactionParams).promise();
-    console.log("Product created successfully:", newProduct);
-    return { ...newProduct, productId };
+    await dynamoDB.send(command);
+    return { product, stock };
   } catch (error) {
     console.error("Error creating product:", error);
     throw error;
