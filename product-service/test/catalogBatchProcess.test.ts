@@ -1,32 +1,39 @@
-import { handler } from '../src/handlers/catalogBatchProcess';
-import { createProduct } from '../src/db/products';
+import { handler } from "../src/handlers/catalogBatchProcess";
+import { SQSEvent } from "aws-lambda";
+import { parseRecord } from "../src/utils";
 
-jest.mock('../src/db/products');
-jest.mock('../src/libs/sns', () => ({
-    send: (command:any) => command,
-}));
+jest.mock("../src/utils");
+(parseRecord as jest.MockedFunction<typeof parseRecord>).mockImplementation(jest.requireActual("../src/utils").parseRecord);
+jest.mock("@aws-sdk/client-sns");
 
-const PRODUCT_MOCK = {
-    description: 'Test product',
-    price: 100,
-    title: 'Test title',
-    count: 10,
+const mockEventsCount = 5;
+const mockEvent: SQSEvent = {
+  Records: new Array(mockEventsCount).fill(null).map(() => ({
+    body: JSON.stringify({
+      title: "",
+      description: "",
+      price: 0,
+      count: 0,
+    }),
+    messageId: "",
+    receiptHandle: "",
+    attributes: null as any,
+    messageAttributes: null as any,
+    eventSource: "",
+    awsRegion: "",
+    eventSourceARN: "",
+    md5OfBody: "",
+  })),
 };
 
-describe('catalogBatch', () => {
-    beforeEach(() => {
-        jest.clearAllMocks();
-    });
+describe("Given catalogBatchProcess handler", () => {
+  describe("when it is invoked", () => {
+    it("should create all products", async () => {
+      await handler(mockEvent);
 
-    it('should return result', async () => {
-        (createProduct as jest.Mock).mockReturnValueOnce(Promise.resolve(PRODUCT_MOCK));
-        const response = await handler( { Records: [{ body: JSON.stringify(PRODUCT_MOCK) }] });
-        expect(response.statusCode).toBe(200);
+      expect(
+        parseRecord as jest.MockedFunction<typeof parseRecord>
+      ).toHaveBeenCalledTimes(mockEventsCount);
     });
-
-    it('should return error', async () => {
-        (createProduct as jest.Mock).mockReturnValueOnce(Promise.reject('Error'));
-        const response = await handler( { Records: [{ body: JSON.stringify(PRODUCT_MOCK) }] });
-        expect(response.statusCode).toBe(500);
-    });
+  });
 });

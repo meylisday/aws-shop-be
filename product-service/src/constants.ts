@@ -1,8 +1,8 @@
 export const PRODUCTS = [
     {
-        "id": '4be63a87-18f7-4416-adf7-1a08a0eca15e',
-        "count": 88,
-        "price": 10,
+        "id": '7e0e37dc-f426-4770-b412-e9fd523ba11d',
+        "count": 1,
+        "price": 111,
         "title": "Product 1",
         "description": "Description 1",
     },

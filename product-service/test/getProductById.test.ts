@@ -5,12 +5,12 @@ import { response } from "../src/utils";
 describe('get product by id', () => {
     test('get product by id', async () => {
         const event = {
-            pathParameters: { productId: '4be63a87-18f7-4416-adf7-1a08a0eca15e' }
+            pathParameters: { productId: '7e0e37dc-f426-4770-b412-e9fd523ba11d' }
         }
 
         const result = await handler(event);
         console.log(result);
-        const productToFind = PRODUCTS.find(item => item.id === '4be63a87-18f7-4416-adf7-1a08a0eca15e')
+        const productToFind = PRODUCTS.find(item => item.id === '7e0e37dc-f426-4770-b412-e9fd523ba11d')
         expect(result).toEqual(response(200, productToFind))
     })
 
