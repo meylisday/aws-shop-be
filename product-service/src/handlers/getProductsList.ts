@@ -1,6 +1,8 @@
 import { DynamoDB } from 'aws-sdk';
 import { response } from '../utils';
 import { APIGatewayProxyResult } from 'aws-lambda';
+import * as dotenv from 'dotenv';
+dotenv.config();
 
 const dynamoDB = new DynamoDB.DocumentClient({ region: 'us-east-1' });
 

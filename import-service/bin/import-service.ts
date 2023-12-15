@@ -1,118 +1,138 @@
-#!/usr/bin/env node
-import * as cdk from 'aws-cdk-lib';
-import * as lambda from 'aws-cdk-lib/aws-lambda';
-import { NodejsFunction, NodejsFunctionProps } from 'aws-cdk-lib/aws-lambda-nodejs';
+import * as cdk from "aws-cdk-lib";
+import * as lambda from "aws-cdk-lib/aws-lambda";
+import {
+  NodejsFunction,
+  NodejsFunctionProps,
+} from "aws-cdk-lib/aws-lambda-nodejs";
 import * as apigateway from "aws-cdk-lib/aws-apigateway";
 import * as s3 from "aws-cdk-lib/aws-s3";
-import { HttpMethods } from 'aws-cdk-lib/aws-s3';
-import * as s3n from 'aws-cdk-lib/aws-s3-notifications';
+import { HttpMethods } from "aws-cdk-lib/aws-s3";
+import * as s3n from "aws-cdk-lib/aws-s3-notifications";
 import { SwaggerUi } from "@pepperize/cdk-apigateway-swagger-ui";
+import * as sqs from 'aws-cdk-lib/aws-sqs';
 
 export const app = new cdk.App();
 
-export const stack = new cdk.Stack(app, 'ImportServiceStack', {
-    env: { region: 'us-east-1' }
-})
+export const stack = new cdk.Stack(app, "ImportServiceStack", {
+  env: { region: "us-east-1" },
+});
+
+const queue = sqs.Queue.fromQueueArn(stack, 'ImportFileQueue', 'arn:aws:sqs:us-east-1:504137854779:import-file-queue');
 
 const sharedLambdaProps: Partial<NodejsFunctionProps> = {
-    runtime: lambda.Runtime.NODEJS_18_X,
-    environment: {
-        PRODUCT_AWS_REGION: 'us-east-1',
-        ACCOUNT_ID: '5041-3785-4779',
-    }
-}
+  runtime: lambda.Runtime.NODEJS_18_X,
+  environment: {
+    PRODUCT_AWS_REGION: 'us-east-1',
+    ACCOUNT_ID: '5041-3785-4779',
+    IMPORT_SQS_URL: queue.queueUrl
+  },
+};
 
-const bucket = new s3.Bucket(stack, 'ImportBucket', { 
-    bucketName: 'aws-shop-be-import-products',       
-    removalPolicy: cdk.RemovalPolicy.DESTROY,
-    autoDeleteObjects: true
+const bucket = new s3.Bucket(stack, "ImportBucket", {
+  bucketName: "aws-shop-be-import-products",
+  removalPolicy: cdk.RemovalPolicy.DESTROY,
+  autoDeleteObjects: true,
 });
 
-const importProductsFileLambda = new NodejsFunction(stack, 'ImportProductsFileLambda', {
+const importProductsFileLambda = new NodejsFunction(
+  stack,
+  "ImportProductsFileLambda",
+  {
     ...sharedLambdaProps,
-    functionName: 'importProductsFile',
-    entry: 'src/handlers/importProductsFile.ts',
-});
+    functionName: "importProductsFile",
+    entry: "src/handlers/importProductsFile.ts",
+  }
+);
 
-const importFileParserLambda = new NodejsFunction(stack, 'ImportFileProductsParserLambda', {
+const importFileParserLambda = new NodejsFunction(
+  stack,
+  "ImportFileProductsParserLambda",
+  {
     ...sharedLambdaProps,
-    functionName: 'importFileParser',
-    entry: 'src/handlers/importFileParser.ts',
-  });
+    functionName: "importFileParser",
+    entry: "src/handlers/importFileParser.ts",
+  }
+);
+
+queue.grantSendMessages(importFileParserLambda);
 
 bucket.grantReadWrite(importProductsFileLambda);
 bucket.grantReadWrite(importFileParserLambda);
 bucket.grantDelete(importFileParserLambda);
 
-const api = new apigateway.RestApi(stack, 'ImportApi', {
-    restApiName: 'Import Service',
-    description: 'This service import products',
-    defaultCorsPreflightOptions: {
-        allowHeaders: ['*'],
-        allowOrigins: ['*'],
-        allowMethods: [HttpMethods.GET, HttpMethods.PUT]
-    },
-    deployOptions: {
-        stageName: 'dev'
-    }
+const api = new apigateway.RestApi(stack, "ImportApi", {
+  restApiName: "Import Service",
+  description: "This service import products",
+  defaultCorsPreflightOptions: {
+    allowHeaders: ["*"],
+    allowOrigins: ["*"],
+    allowMethods: [HttpMethods.GET, HttpMethods.PUT],
+  },
+  deployOptions: {
+    stageName: "dev",
+  },
 });
 
-const importModel = api.addModel('ImportModel', {
-    modelName: 'ImportModel',
-    contentType: 'application/json',
-    schema: {
-      schema: apigateway.JsonSchemaVersion.DRAFT4,
-      title: 'importModel',
-      type: apigateway.JsonSchemaType.OBJECT,
-      properties: {
-        name: {
-          type: apigateway.JsonSchemaType.STRING,
-        },
+const importModel = api.addModel("ImportModel", {
+  modelName: "ImportModel",
+  contentType: "application/json",
+  schema: {
+    schema: apigateway.JsonSchemaVersion.DRAFT4,
+    title: "importModel",
+    type: apigateway.JsonSchemaType.OBJECT,
+    properties: {
+      name: {
+        type: apigateway.JsonSchemaType.STRING,
       },
     },
-  });
-
-const importProductFilesIntegration = new apigateway.LambdaIntegration(importProductsFileLambda);
-
-const importProductFilesResource = api.root.addResource('import', {
-    defaultCorsPreflightOptions: {
-        allowHeaders: ['*'],
-        allowOrigins: ['*'],
-        allowMethods: [HttpMethods.GET, HttpMethods.PUT],
-    },
+  },
 });
 
-importProductFilesResource.addMethod('GET', importProductFilesIntegration, {
-    methodResponses: [
+const importProductFilesIntegration = new apigateway.LambdaIntegration(
+  importProductsFileLambda
+);
+
+const importProductFilesResource = api.root.addResource("import", {
+  defaultCorsPreflightOptions: {
+    allowHeaders: ["*"],
+    allowOrigins: ["*"],
+    allowMethods: [HttpMethods.GET, HttpMethods.PUT],
+  },
+});
+
+importProductFilesResource.addMethod("GET", importProductFilesIntegration, {
+  methodResponses: [
     {
-        statusCode: '200',
-        responseModels: {
-        'application/json': importModel,
-        },
-        responseParameters: {
-        'method.response.header.Access-Control-Allow-Origin': true,
-        'method.response.header.Access-Control-Allow-Credentials': true,
-        },
+      statusCode: "200",
+      responseModels: {
+        "application/json": importModel,
+      },
+      responseParameters: {
+        "method.response.header.Access-Control-Allow-Origin": true,
+        "method.response.header.Access-Control-Allow-Credentials": true,
+      },
     },
     {
-        statusCode: '400',
-        responseModels: {
-        'application/json': importModel,
-        },
-        responseParameters: {
-        'method.response.header.Access-Control-Allow-Origin': true,
-        'method.response.header.Access-Control-Allow-Credentials': true,
-        },
+      statusCode: "400",
+      responseModels: {
+        "application/json": importModel,
+      },
+      responseParameters: {
+        "method.response.header.Access-Control-Allow-Origin": true,
+        "method.response.header.Access-Control-Allow-Credentials": true,
+      },
     },
-    ],
-    authorizationType: apigateway.AuthorizationType.NONE,
-    apiKeyRequired: false,
+  ],
+  authorizationType: apigateway.AuthorizationType.NONE,
+  apiKeyRequired: false,
 });
 
 bucket.addEventNotification(
-    s3.EventType.OBJECT_CREATED, 
-    new s3n.LambdaDestination(importFileParserLambda), {
-    prefix: 'uploaded',
-});
+  s3.EventType.OBJECT_CREATED,
+  new s3n.LambdaDestination(importFileParserLambda),
+  {
+    prefix: "uploaded",
+  }
+);
 
 new SwaggerUi(stack, "SwaggerUI", { resource: api.root });

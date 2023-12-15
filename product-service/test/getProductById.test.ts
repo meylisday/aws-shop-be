@@ -5,11 +5,12 @@ import { response } from "../src/utils";
 describe('get product by id', () => {
     test('get product by id', async () => {
         const event = {
-            pathParameters: { productId: '1' }
+            pathParameters: { productId: '7e0e37dc-f426-4770-b412-e9fd523ba11d' }
         }
 
-        const result = await handler(event)
-        const productToFind = PRODUCTS.find(item => item.id === '1')
+        const result = await handler(event);
+        console.log(result);
+        const productToFind = PRODUCTS.find(item => item.id === '7e0e37dc-f426-4770-b412-e9fd523ba11d')
         expect(result).toEqual(response(200, productToFind))
     })
 
@@ -17,11 +18,8 @@ describe('get product by id', () => {
         const event = {
             pathParameters: {}
         }
-
         const result = await handler(event);
-
-        expect(result).toEqual(response(400, 'Error: you are missing the path parameter id'))
-
+        expect(result).toEqual(response(400, 'Error: Missing the path parameter productId'));
     })
 
     test('error', async () => {
