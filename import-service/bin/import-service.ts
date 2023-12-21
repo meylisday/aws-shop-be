@@ -10,12 +10,17 @@ import { HttpMethods } from "aws-cdk-lib/aws-s3";
 import * as s3n from "aws-cdk-lib/aws-s3-notifications";
 import { SwaggerUi } from "@pepperize/cdk-apigateway-swagger-ui";
 import * as sqs from 'aws-cdk-lib/aws-sqs';
+import { Function } from 'aws-cdk-lib/aws-lambda';
+import { ResponseType, TokenAuthorizer } from 'aws-cdk-lib/aws-apigateway';
+import { PolicyStatement, Role, ServicePrincipal } from 'aws-cdk-lib/aws-iam';
 
 export const app = new cdk.App();
 
 export const stack = new cdk.Stack(app, "ImportServiceStack", {
   env: { region: "us-east-1" },
 });
+
+const authorizer = Function.fromFunctionArn(stack, 'basicAuthorizer', 'arn:aws:lambda:us-east-1:504137854779:function:basicAuthorizer');
 
 const queue = sqs.Queue.fromQueueArn(stack, 'ImportFileQueue', 'arn:aws:sqs:us-east-1:504137854779:import-file-queue');
 
@@ -73,21 +78,6 @@ const api = new apigateway.RestApi(stack, "ImportApi", {
   },
 });
 
-const importModel = api.addModel("ImportModel", {
-  modelName: "ImportModel",
-  contentType: "application/json",
-  schema: {
-    schema: apigateway.JsonSchemaVersion.DRAFT4,
-    title: "importModel",
-    type: apigateway.JsonSchemaType.OBJECT,
-    properties: {
-      name: {
-        type: apigateway.JsonSchemaType.STRING,
-      },
-    },
-  },
-});
-
 const importProductFilesIntegration = new apigateway.LambdaIntegration(
   importProductsFileLambda
 );
@@ -100,31 +90,40 @@ const importProductFilesResource = api.root.addResource("import", {
   },
 });
 
+api.addGatewayResponse('ImportProductsFileUnauthorized', {
+  type: ResponseType.UNAUTHORIZED,
+  statusCode: '401',
+  responseHeaders: {
+    'Access-Control-Allow-Origin': "'*'"
+  },
+});
+
+api.addGatewayResponse('ImportProductsFileForbidden', {
+  type: ResponseType.ACCESS_DENIED,
+  statusCode: '403',
+  responseHeaders: {
+    'Access-Control-Allow-Origin': "'*'"
+  },
+});
+
+const authRole = new Role(stack, 'ImportProductsFileAuthorizerRole', {
+  assumedBy: new ServicePrincipal('apigateway.amazonaws.com'),
+});
+
+authRole.addToPolicy(
+  new PolicyStatement({
+    actions: ['lambda:InvokeFunction'],
+    resources: [authorizer.functionArn],
+  }),
+);
+
+const importProductsFileAuthorizer = new TokenAuthorizer(stack, 'ImportProductsFileAuthorizer', {
+  handler: authorizer,
+  assumeRole: authRole,
+});
+
 importProductFilesResource.addMethod("GET", importProductFilesIntegration, {
-  methodResponses: [
-    {
-      statusCode: "200",
-      responseModels: {
-        "application/json": importModel,
-      },
-      responseParameters: {
-        "method.response.header.Access-Control-Allow-Origin": true,
-        "method.response.header.Access-Control-Allow-Credentials": true,
-      },
-    },
-    {
-      statusCode: "400",
-      responseModels: {
-        "application/json": importModel,
-      },
-      responseParameters: {
-        "method.response.header.Access-Control-Allow-Origin": true,
-        "method.response.header.Access-Control-Allow-Credentials": true,
-      },
-    },
-  ],
-  authorizationType: apigateway.AuthorizationType.NONE,
-  apiKeyRequired: false,
+  authorizer: importProductsFileAuthorizer,
 });
 
 bucket.addEventNotification(
