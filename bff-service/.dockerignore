@@ -1,0 +1,52 @@
+# Exclude node_modules directory as we will install dependencies in the image
+node_modules/
+
+# Exclude development-related files and directories
+# These are not needed in the production image
+.dockerignore
+.git
+.gitignore
+
+# Exclude development dependencies
+# We only need production dependencies to run the application
+package-lock.json
+yarn.lock
+
+# Exclude editor-related files and directories
+# These are not needed in the production image
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# Exclude test files and directories
+# Tests are usually not required in the production image
+__tests__/
+test/
+tests/
+
+# Exclude any build or output directories
+# These files are not needed in the production image
+dist/
+build/
+out/
+output/
+
+# Exclude any temporary or cache directories
+# These files are not needed in the production image
+tmp/
+temp/
+cache/
+*.tmp
+
+# Exclude documentation files and directories
+# These files are not needed in the production image
+doc/
+docs/
+*.md
+
+# Exclude any log files generated during development or testing
+# These files are not needed in the production image
+*.log
+logs/
+log/
